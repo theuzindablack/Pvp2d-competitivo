@@ -1,0 +1,452 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #121212;
+  font-family: monospace;
+  color: #fff;
+}
+
+#lobby-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(18, 18, 18, 0.95);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  gap: 15px;
+}
+
+.card {
+  background: #222;
+  padding: 20px;
+  border: 2px solid #555;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 320px;
+  text-align: center;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  background: #111;
+  border: 1px solid #444;
+  color: #fff;
+  font-family: monospace;
+  text-align: center;
+  font-size: 16px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: #5b8731;
+  border: none;
+  color: #fff;
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 5px;
+}
+
+button:active {
+  background: #466924;
+}
+
+#game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+  display: none;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+#top-right-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+#btn-fullscreen, #btn-exit-room, #btn-toggle-chat, #btn-toggle-admin {
+  width: auto;
+  padding: 6px 12px;
+  border-radius: 4px;
+  color: #ffffff;
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  margin: 0;
+}
+
+#btn-fullscreen {
+  background: rgba(142, 68, 173, 0.9);
+  border: 1px solid #c39bd3;
+}
+
+#btn-exit-room {
+  background: rgba(180, 40, 40, 0.85);
+  border: 1px solid #ff6666;
+}
+
+#btn-toggle-chat {
+  background: rgba(44, 117, 211, 0.85);
+  border: 1px solid #66a3ff;
+}
+
+#btn-toggle-admin {
+  background: rgba(230, 160, 0, 0.9);
+  border: 1px solid #ffdd66;
+  color: #000;
+  display: none;
+}
+
+#admin-toolbar {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  z-index: 40;
+  display: none;
+  flex-direction: column;
+  width: 280px;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 10px;
+  border: 2px solid #ffcc00;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+}
+
+.admin-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-btn {
+  flex: 1 1 28%;
+  height: 48px;
+  font-size: 10px;
+  background: #333;
+  border: 1px solid #777;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  margin: 0;
+}
+
+.admin-btn.selected {
+  border: 2px solid #ffcc00;
+  background: #555;
+}
+
+#team-config-box {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  background: #222;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #666;
+  font-size: 10px;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+#team-name-input {
+  padding: 4px 6px;
+  margin: 0;
+  font-size: 11px;
+  text-align: left;
+}
+
+#team-color-picker {
+  border: none;
+  width: 32px;
+  height: 24px;
+  background: none;
+  cursor: pointer;
+}
+
+#btn-set-global-spawn {
+  background: #d35400;
+  border: 1px solid #e67e22;
+  padding: 8px;
+  font-size: 10px;
+  border-radius: 4px;
+  color: #fff;
+}
+
+#btn-toggle-touch-team {
+  padding: 6px;
+  font-size: 10px;
+  background: #2a6f3b;
+  border: 1px solid #55ff55;
+}
+
+#btn-toggle-touch-team.off {
+  background: #7a2a2a;
+  border-color: #ff5555;
+}
+
+#btn-toggle-collision {
+  width: 100%;
+  padding: 6px;
+  background: #2a6f3b;
+  border: 1px solid #55ff55;
+  color: #fff;
+  font-size: 10px;
+  border-radius: 4px;
+}
+
+#btn-toggle-collision.off {
+  background: #7a2a2a;
+  border-color: #ff5555;
+}
+
+#hotbar-container {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 6px;
+  border: 2px solid #555;
+  border-radius: 8px;
+  z-index: 50;
+}
+
+.hotbar-slot {
+  width: 50px;
+  height: 50px;
+  background: rgba(40, 40, 40, 0.8);
+  border: 2px solid #777;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  position: relative;
+}
+
+.hotbar-slot.active {
+  border: 2px solid #5555ff;
+  background: rgba(60, 60, 100, 0.9);
+  box-shadow: 0 0 10px #5555ff;
+}
+
+.hotbar-key {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  color: #aaa;
+}
+
+#teams-modal, #ranks-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 15, 15, 0.95);
+  border: 2px solid #ffcc00;
+  border-radius: 8px;
+  padding: 16px;
+  width: 300px;
+  max-height: 400px;
+  display: none;
+  flex-direction: column;
+  z-index: 1000;
+  box-shadow: 0 0 20px rgba(0,0,0,0.9);
+}
+
+#teams-modal h3, #ranks-modal h3 {
+  text-align: center;
+  font-size: 14px;
+  color: #ffcc00;
+  margin-bottom: 10px;
+}
+
+#teams-list, #ranks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 280px;
+  padding-right: 4px;
+}
+
+.rank-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #222;
+  border: 1px solid #444;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.rank-btn-action {
+  width: auto;
+  padding: 4px 8px;
+  font-size: 10px;
+  margin: 0;
+  border-radius: 3px;
+}
+
+.btn-give-admin {
+  background: #27ae60;
+}
+
+.btn-remove-admin {
+  background: #c0392b;
+}
+
+.team-select-btn {
+  padding: 10px;
+  font-size: 12px;
+  color: #fff;
+  border-radius: 4px;
+  border: 1px solid #fff;
+  text-shadow: 1px 1px 2px #000;
+  cursor: pointer;
+  text-align: center;
+  margin: 0;
+}
+
+#chat-box {
+  width: 260px;
+  height: 200px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #555;
+  border-radius: 6px;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+}
+
+#chat-messages {
+  flex: 1;
+  padding: 6px;
+  overflow-y: auto;
+  font-size: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.msg { word-break: break-word; }
+.msg-system { color: #ffff55; }
+.msg-self { color: #55ff55; }
+.msg-other { color: #55ffff; }
+
+#chat-input-area {
+  display: flex;
+  border-top: 1px solid #444;
+}
+
+#chat-input {
+  flex: 1;
+  padding: 6px;
+  background: #111;
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  font-family: monospace;
+  margin: 0;
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+#btn-chat-send {
+  width: 40px;
+  padding: 6px;
+  margin: 0;
+  font-size: 10px;
+  background: #5b8731;
+  border: none;
+}
+
+#joystick-base {
+  position: absolute;
+  bottom: 30px;
+  left: 30px;
+  width: 120px;
+  height: 120px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 3px solid #727272;
+  border-radius: 50%;
+  touch-action: none;
+  z-index: 10;
+}
+
+#joystick-thumb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  background: #555;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  }
+  
