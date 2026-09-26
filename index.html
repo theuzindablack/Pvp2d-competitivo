@@ -2,80 +2,127 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Core OS - Cliente</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Core OS - Master Oche (Hub PvP)</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root { --main: #00f2ff; --bg: #0b0f19; --card: rgba(20, 25, 38, 0.95); }
-        body { background: var(--bg); color: white; font-family: 'Courier New', monospace; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        
-        .card { background: var(--card); border: 2px solid var(--main); border-radius: 12px; padding: 25px; width: 90%; max-width: 380px; box-shadow: 0 0 20px rgba(0,242,255,0.2); text-align: center; }
-        h1 { font-size: 20px; color: var(--main); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px; }
-        
-        .input-group { margin-bottom: 15px; text-align: left; }
-        label { display: block; font-size: 11px; color: #8b9bb4; margin-bottom: 5px; text-transform: uppercase; }
-        input { width: 100%; padding: 12px; background: #07090f; border: 1px solid #23314f; border-radius: 6px; color: #fff; font-size: 14px; outline: none; font-family: monospace; }
-        
-        .btn-acao { background: var(--main); color: #07090f; width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; text-transform: uppercase; font-family: monospace; margin-top: 10px; }
-        .btn-acao:hover { background: #00c2cc; }
+        body { background: #050505; color: #00ff88; font-family: 'Courier New', monospace; padding: 20px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: #111; border: 2px solid #00ff88; border-radius: 8px; padding: 20px; box-shadow: 0 0 20px rgba(0,255,136,0.15); }
+        h1 { font-size: 18px; text-transform: uppercase; margin-top: 0; border-bottom: 1px solid #222; padding-bottom: 10px; }
+        .log-box { background: #000; border: 1px solid #222; border-radius: 4px; padding: 10px; height: 300px; overflow-y: auto; font-size: 12px; color: #ccc; margin-top: 15px; }
+        .status { font-weight: bold; margin-bottom: 10px; font-size: 13px; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1>Entrar na Fila</h1>
+    <div class="container">
+        <h1>Central Oche Hub (Matchmaking)</h1>
+        <div id="status-rede" class="status">Status: Iniciando Hub Central...</div>
+        <p style="font-size: 11px; color: #888;">ID Fixo Ativo: <b style="color: #fff;">core-os-oche-master-hub-2026</b></p>
         
-        <div class="input-group">
-            <label>Seu Nick</label>
-            <input type="text" id="nomeUser" value="Player1" maxlength="15">
-        </div>
-
-        <button class="btn-acao" onclick="entrarNaFila()">Entrar na Fila</button>
-        <div id="status" style="font-size:11px; color:#888; margin-top:10px;"></div>
+        <div style="font-size: 11px; text-transform: uppercase; color: #666; margin-top: 15px;">Log de Atividades da Fila:</div>
+        <div id="logs" class="log-box"></div>
     </div>
 
     <script>
-        const MASTER_ID = "core-os-master-hub-2026";
-        let meuPeer;
+        const ID_FIXO_OCHE = "core-os-oche-master-hub-2026";
+        let masterPeer = null;
+        let filaEspera = [];
 
-        function entrarNaFila() {
-            const nome = document.getElementById('nomeUser').value.trim() || "Player";
-            document.getElementById('status').innerText = "Conectando...";
+        function log(msg) {
+            const box = document.getElementById('logs');
+            const hora = new Date().toLocaleTimeString();
+            box.innerHTML += `[${hora}] ${msg}<br>`;
+            box.scrollTop = box.scrollHeight;
+        }
 
-            // Cria um peer para o cliente e se conecta ao Master
-            meuPeer = new Peer({
-                config: { 
-                    'iceServers': [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' }
-                    ] 
+        function iniciarOcheHub() {
+            log("Conectando o Hub Central com ID fixo...");
+            
+            // Destroi anterior se existir
+            if (masterPeer) {
+                try { masterPeer.destroy(); } catch(e){}
+            }
+
+            masterPeer = new Peer(ID_FIXO_OCHE);
+
+            masterPeer.on('open', (id) => {
+                document.getElementById('status-rede').innerHTML = `Status: <span style="color: #00ff88;">ONLINE (Ouvindo conexões)</span>`;
+                log(`Hub pronto! ID fixo registrado com sucesso: ${id}`);
+            });
+
+            masterPeer.on('connection', (conn) => {
+                conn.on('data', (data) => {
+                    if (!data) return;
+
+                    // 1. Jogador entrou na fila
+                    if (data.tipo === 'entrar_fila') {
+                        log(`Novo player na fila: <b>${data.nome}</b> (PeerID: ${data.peerId})`);
+                        
+                        // Evita duplicata do mesmo PeerID
+                        filaEspera = filaEspera.filter(p => p.peerId !== data.peerId);
+                        filaEspera.push({ peerId: data.peerId, nome: data.nome, conn: conn });
+
+                        checarMatchmaking();
+                    }
+
+                    // 2. Resultado de partida finalizado
+                    if (data.tipo === 'fim_partida_resultado') {
+                        log(`🏆 Fim de partida reportado! Vencedor: <b>${data.vencedor}</b> | Perdedor: ${data.perdedor}`);
+                    }
+                });
+
+                conn.on('close', () => {
+                    // Remove da fila caso o player feche a página enquanto espera
+                    filaEspera = filaEspera.filter(p => p.conn !== conn);
+                });
+            });
+
+            masterPeer.on('error', (err) => {
+                log(`Erro no Hub: ${err.type}`);
+                if (err.type === 'unavailable-id') {
+                    document.getElementById('status-rede').innerHTML = `Status: <span style="color: #ff3366;">ERRO: ID já está em uso em outra aba!</span>`;
+                    log("Já existe outra aba do Oche aberta. Feche-a para usar esta.");
+                } else {
+                    // Tenta reiniciar automaticamente após 3 segundos se cair
+                    setTimeout(iniciarOcheHub, 3000);
                 }
             });
-
-            meuPeer.on('open', (id) => {
-                const masterConn = meuPeer.connect(MASTER_ID);
-
-                masterConn.on('open', () => {
-                    document.getElementById('status').innerText = "Na fila! Aguardando partida...";
-                    masterConn.send({
-                        tipo: "entrar_fila",
-                        peerId: id,
-                        nome: nome
-                    });
-
-                    // Salva localmente para a arena de jogo usar quando iniciar
-                    localStorage.setItem('core_os_username', nome);
-                });
-
-                masterConn.on('error', () => {
-                    document.getElementById('status').innerText = "Erro ao conectar com o Master.";
-                });
-            });
-
-            meuPeer.on('error', (err) => {
-                document.getElementById('status').innerText = "Erro na rede: " + err.type;
-            });
         }
+
+        function checarMatchmaking() {
+            if (filaEspera.length >= 2) {
+                let p1 = filaEspera.shift();
+                let p2 = filaEspera.shift();
+
+                let salaJogoId = 'sala-pvp-' + Math.random().toString(36).substr(2, 9);
+                log(`Match encontrado! ⚔️ <b>${p1.nome}</b> vs <b>${p2.nome}</b> | Sala: ${salaJogoId}`);
+
+                // O p1 vira o HOST da partida, o p2 vira o CLIENTE
+                try {
+                    p1.conn.send({
+                        tipo: 'iniciar_partida',
+                        papel: 'host',
+                        adversario: p2.nome,
+                        salaJogoId: salaJogoId
+                    });
+                } catch(e) { log(`Erro ao enviar comando para ${p1.nome}`); }
+
+                try {
+                    p2.conn.send({
+                        tipo: 'iniciar_partida',
+                        papel: 'cliente',
+                        adversario: p1.nome,
+                        salaJogoId: salaJogoId
+                    });
+                } catch(e) { log(`Erro ao enviar comando para ${p2.nome}`); }
+            } else {
+                log(`Fila atual: ${filaEspera.length} jogador(es) aguardando...`);
+            }
+        }
+
+        // Iniciar ao carregar
+        iniciarOcheHub();
     </script>
 </body>
 </html>
