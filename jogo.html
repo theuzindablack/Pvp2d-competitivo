@@ -8,7 +8,7 @@
         body { background: #000; color: #fff; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; touch-action: none; user-select: none; }
         canvas { display: block; background: #080808; margin: 0 auto; }
         
-        #hud { position: absolute; top: 15px; left: 0; width: 100%; display: flex; justify-content: space-around; pointer-events: none; font-size: 14px; font-weight: bold; text-shadow: 0 0 5px #000; }
+        #hud { position: absolute; top: 15px; left: 0; width: 100%; display: flex; justify-content: space-around; pointer-events: none; font-size: 14px; font-weight: bold; text-shadow: 0 0 5px #000; z-index: 5; }
         .hud-p1 { color: #00f2ff; }
         .hud-p2 { color: #ff0055; }
 
@@ -17,23 +17,23 @@
         #overlay-sub { font-size: 13px; color: #aaa; margin-bottom: 20px; }
         .btn-acao { background: #00ff88; color: #000; border: none; padding: 12px 30px; font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-family: monospace; }
         
-        /* Controles Mobile */
-        .joystick-base { position: absolute; bottom: 20px; left: 20px; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.15); border-radius: 50%; touch-action: none; }
-        .joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(0,242,255,0.4); border: 2px solid #00f2ff; border-radius: 50%; pointer-events: none; }
+        /* Joystick Mobile */
+        .joystick-base { position: absolute; bottom: 30px; left: 30px; width: 130px; height: 130px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.15); border-radius: 50%; touch-action: none; z-index: 5; }
+        .joystick-stick { position: absolute; top: 40px; left: 40px; width: 50px; height: 50px; background: rgba(0,242,255,0.4); border: 2px solid #00f2ff; border-radius: 50%; pointer-events: none; transition: transform 0.05s linear; }
         
-        .btn-atirar { position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px; background: rgba(255,0,85,0.4); border: 2px solid #ff0055; border-radius: 50%; color: white; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+        .btn-atirar { position: absolute; bottom: 40px; right: 30px; width: 85px; height: 85px; background: rgba(255,0,85,0.4); border: 2px solid #ff0055; border-radius: 50%; color: white; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 0 10px rgba(255,0,85,0.3); }
     </style>
 </head>
 <body>
 
     <div id="hud">
-        <div class="hud-p1">VOCÊ (<span id="nome-voce">Player</span>): <span id="hp-voce">100</span> HP</div>
-        <div class="hud-p2"><span id="nome-adv">Adversario</span>: <span id="hp-adv">100</span> HP</div>
+        <div class="hud-p1">VOCÊ (AZUL): <span id="hp-voce">100</span> HP</div>
+        <div class="hud-p2">ADVERSÁRIO (VERMELHO): <span id="hp-adv">100</span> HP</div>
     </div>
 
     <div id="tela-overlay">
         <div id="overlay-msg">CONECTANDO À ARENA</div>
-        <div id="overlay-sub">Preparando combate contra o oponente...</div>
+        <div id="overlay-sub">Preparando o campo de batalha...</div>
         <button id="btn-voltar" class="btn-acao" style="display:none;" onclick="fecharArena()">SAIR DA ARENA</button>
     </div>
 
@@ -60,21 +60,32 @@
         const adversarioNome = urlParams.get('adversario') || "Adversario";
         const meuNome = localStorage.getItem('core_os_username') || "Player";
 
-        document.getElementById('nome-voce').innerText = meuNome;
-        document.getElementById('nome-adv').innerText = adversarioNome;
-
         let jogoAtivo = false;
         let meuHP = 100;
         let advHP = 100;
 
-        let playerX = canvas.width / 2 - 100;
+        // Posições Iniciais (Jogador 1 Azul e Jogador 2 Vermelho)
+        let playerX = 100;
         let playerY = canvas.height / 2;
-        let advX = canvas.width / 2 + 100;
+        let advX = canvas.width - 100;
         let advY = canvas.height / 2;
 
+        const raioPlayer = 18;
         let balas = [];
 
-        // Controles de Joystick Touch
+        // Caixas de Obstáculos na Arena
+        const caixas = [
+            { x: canvas.width / 2 - 40, y: canvas.height / 2 - 80, w: 80, h: 160 },
+            { x: canvas.width / 4, y: 100, w: 100, h: 40 },
+            { x: (canvas.width / 4) * 3 - 100, y: canvas.height - 140, w: 100, h: 40 }
+        ];
+
+        // Controles Teclado (WASD)
+        const teclas = { w: false, a: false, s: false, d: false };
+        window.addEventListener('keydown', (e) => { if (teclas.hasOwnProperty(e.key.toLowerCase())) teclas[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', (e) => { if (teclas.hasOwnProperty(e.key.toLowerCase())) teclas[e.key.toLowerCase()] = false; });
+
+        // Joystick Touch Corrigido
         let jsAtivo = false;
         let jsCentroX = 0, jsCentroY = 0;
         let moveX = 0, moveY = 0;
@@ -106,7 +117,7 @@
             let dx = clientX - jsCentroX;
             let dy = clientY - jsCentroY;
             const dist = Math.hypot(dx, dy);
-            const raioMax = 35;
+            const raioMax = 40;
 
             if (dist > raioMax) {
                 dx = (dx / dist) * raioMax;
@@ -118,13 +129,24 @@
             moveY = dy / raioMax;
         }
 
-        // Botão Atirar
+        // Botão Atirar (Disparo Direcionado para o Inimigo)
         document.getElementById('btn-fire').addEventListener('pointerdown', () => {
             if (!jogoAtivo) return;
-            balas.push({ x: playerX, y: playerY, vx: 8, vy: 0, nosso: true });
+            
+            // Calcula o ângulo exato em direção ao adversário
+            let angulo = Math.atan2(advY - playerY, advX - playerX);
+            let velocidadeTiro = 9;
+
+            balas.push({
+                x: playerX,
+                y: playerY,
+                vx: Math.cos(angulo) * velocidadeTiro,
+                vy: Math.sin(angulo) * velocidadeTiro,
+                nosso: true
+            });
         });
 
-        // Contagem Regressiva Inicial
+        // Contagem Regressiva
         let contador = 3;
         const overlay = document.getElementById('tela-overlay');
         const msg = document.getElementById('overlay-msg');
@@ -133,7 +155,7 @@
         function iniciarContagem() {
             if (contador > 0) {
                 msg.innerText = contador;
-                sub.innerText = "Prepare-se para o combate!";
+                sub.innerText = "Preparem-se!";
                 contador--;
                 setTimeout(iniciarContagem, 1000);
             } else {
@@ -142,35 +164,77 @@
                 setTimeout(() => {
                     overlay.style.display = 'none';
                     jogoAtivo = true;
-                }, 800);
+                }, 700);
             }
         }
         setTimeout(iniciarContagem, 500);
 
-        // Loop Principal do Jogo
+        // Verificação de colisão com caixas
+        ellsColideCaixa = function(nx, ny) {
+            for (let c of caixas) {
+                if (nx + raioPlayer > c.x && nx - raioPlayer < c.x + c.w &&
+                    ny + raioPlayer > c.y && ny - raioPlayer < c.y + c.h) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Loop Principal
         function loop() {
             ctx.fillStyle = '#080808';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Desenhar Paredes / Bordas da Arena
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+            // Desenhar Caixas Obstáculos
+            ctx.fillStyle = '#1c1c1c';
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            for (let c of caixas) {
+                ctx.fillRect(c.x, c.y, c.w, c.h);
+                ctx.strokeRect(c.x, c.y, c.w, c.h);
+            }
+
             if (jogoAtivo) {
-                // Movimentação do Jogador
-                playerX += moveX * 4;
-                playerY += moveY * 4;
+                // Movimento via Teclado (WASD)
+                let tecladoX = 0, tecladoY = 0;
+                if (teclas.w) tecladoY = -1;
+                if (teclas.s) tecladoY = 1;
+                if (teclas.a) tecladoX = -1;
+                if (teclas.d) tecladoX = 1;
 
-                // Limites da tela
-                playerX = Math.max(20, Math.min(canvas.width - 20, playerX));
-                playerY = Math.max(20, Math.min(canvas.height - 20, playerY));
+                let finalMoveX = moveX !== 0 ? moveX : tecladoX;
+                let finalMoveY = moveY !== 0 ? moveY : tecladoY;
 
-                // Simulação simples de IA inimiga reativa na arena local
+                let proximoX = playerX + finalMoveX * 4.5;
+                let proximoY = playerY + finalMoveY * 4.5;
+
+                // Colisão com bordas da tela e caixas
+                if (proximoX > 20 && proximoX < canvas.width - 20 && !ellsColideCaixa(proximoX, playerY)) playerX = proximoX;
+                if (proximoY > 20 && proximoY < canvas.height - 20 && !ellsColideCaixa(playerX, proximoY)) playerY = proximoY;
+
+                // IA Simples do Adversário Vermelho
                 if (Math.random() < 0.02) {
-                    advX += (Math.random() - 0.5) * 40;
-                    advY += (Math.random() - 0.5) * 40;
+                    advX += (Math.random() - 0.5) * 45;
+                    advY += (Math.random() - 0.5) * 45;
+                    advX = Math.max(30, Math.min(canvas.width - 30, advX));
+                    advY = Math.max(30, Math.min(canvas.height - 30, advY));
                 }
-                if (Math.random() < 0.03) {
-                    balas.push({ x: advX, y: advY, vx: -6, vy: (Math.random() - 0.5) * 2, nosso: false });
+                if (Math.random() < 0.035) {
+                    let anguloAdv = Math.atan2(playerY - advY, playerX - advX);
+                    balas.push({
+                        x: advX, y: advY,
+                        vx: Math.cos(anguloAdv) * 7,
+                        vy: Math.sin(anguloAdv) * 7,
+                        nosso: false
+                    });
                 }
 
-                // Atualizar Balas
+                // Atualizar Balas e Colisões
                 for (let i = balas.length - 1; i >= 0; i--) {
                     let b = balas[i];
                     b.x += b.vx;
@@ -178,32 +242,55 @@
 
                     ctx.fillStyle = b.nosso ? '#00f2ff' : '#ff0055';
                     ctx.beginPath();
-                    ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+                    ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Colisões
-                    if (b.nosso && Math.hypot(b.x - advX, b.y - advY) < 20) {
-                        advHP -= 10;
+                    // Colisão bala com caixas
+                    let colidiuCaixa = false;
+                    for (let c of caixas) {
+                        if (b.x > c.x && b.x < c.x + c.w && b.y > c.y && b.y < c.y + c.h) {
+                            colidiuCaixa = true;
+                            break;
+                        }
+                    }
+
+                    if (colidiuCaixa || b.x < 10 || b.x > canvas.width - 10 || b.y < 10 || b.y > canvas.height - 10) {
+                        balas.splice(i, 1);
+                        continue;
+                    }
+
+                    // Colisões com jogadores
+                    if (b.nosso && Math.hypot(b.x - advX, b.y - advY) < raioPlayer) {
+                        advHP -= 15;
                         document.getElementById('hp-adv').innerText = Math.max(0, advHP);
                         balas.splice(i, 1);
                         if (advHP <= 0) { finalizarPartida(true); break; }
-                    } else if (!b.nosso && Math.hypot(b.x - playerX, b.y - playerY) < 20) {
-                        meuHP -= 10;
+                    } else if (!b.nosso && Math.hypot(b.x - playerX, b.y - playerY) < raioPlayer) {
+                        meuHP -= 15;
                         document.getElementById('hp-voce').innerText = Math.max(0, meuHP);
                         balas.splice(i, 1);
                         if (meuHP <= 0) { finalizarPartida(false); break; }
-                    } else if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
-                        balas.splice(i, 1);
                     }
                 }
             }
 
-            // Desenhar Jogadores
+            // Desenhar Jogador 1 (AZUL)
             ctx.fillStyle = '#00f2ff';
-            ctx.beginPath(); ctx.arc(playerX, playerY, 16, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); 
+            ctx.arc(playerX, playerY, raioPlayer, 0, Math.PI * 2); 
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
+            // Desenhar Jogador 2 (VERMELHO)
             ctx.fillStyle = '#ff0055';
-            ctx.beginPath(); ctx.arc(advX, advY, 16, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); 
+            ctx.arc(advX, advY, raioPlayer, 0, Math.PI * 2); 
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
             requestAnimationFrame(loop);
         }
