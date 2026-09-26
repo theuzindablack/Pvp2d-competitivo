@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -218,8 +218,7 @@
             }
             loop();
         }
-
-        function conectarPartidaComReconexao(papel, salaId) {
+         function conectarPartidaComReconexao(papel, salaId) {
             peerJogo = new Peer((papel === 'host') ? salaId : undefined);
 
             peerJogo.on('open', () => {
@@ -459,4 +458,18 @@
             ctx.beginPath(); ctx.moveTo(0, cv.height/2); ctx.lineTo(cv.width, cv.height/2); ctx.stroke();
             ctx.setLineDash([]);
 
-            ctx.fillStyle = minha
+            ctx.fillStyle = minhaCor; 
+            ctx.fillRect(meuX, meuY, 32, 32);
+            ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+            ctx.fillText(meuNome, meuX+16, meuY-6);
+
+            ctx.fillStyle = corAdv; 
+            ctx.fillRect(advX, advY, 32, 32);
+            ctx.fillText(nomeAdv, advX+16, advY-6);
+
+            ctx.fillStyle = '#facc15';
+            for (let b of balas) ctx.fillRect(b.x, b.y, 4, 10);
+        }
+    </script>
+</body>
+</html>
