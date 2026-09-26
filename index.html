@@ -162,7 +162,6 @@
             }
         }
 
-        // Função disparada pelo jogo de tiro quando acaba a partida (vitória/derrota)
         window.enviarPontuacaoExterna = function(pontosDelta) {
             if (conexaoAtiva && conexaoAtiva.open) {
                 conexaoAtiva.send({ tipo: "atualizar_pontos", usuario: username, pontos: pontosDelta });
@@ -183,7 +182,6 @@
             `).join('');
         }
 
-        // Abre o jogo de tiro via iframe carregando o arquivo jogo.html
         function BOOT_GAME(adversario) {
             const viewport = document.getElementById('SISTEMA_VIEWPORT');
             const container = document.getElementById('SISTEMA_CONTAINER');
