@@ -1,84 +1,49 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Core OS - Cliente & Arena</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Core OS - Cliente</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root { --main: #00f2ff; --bg: #050505; --card: #111; --neon: #0f0; }
-        body { background: var(--bg); color: white; font-family: 'Courier New', monospace; margin: 0; padding: 12px; }
-        nav { border-bottom: 2px solid var(--main); padding: 12px 15px; display: flex; justify-content: space-between; background: #000; align-items: center; }
-        .status { color: var(--neon); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
-        .user-bar { background: #111; border: 1px solid #333; padding: 12px; border-radius: 8px; margin: 12px 0; display: flex; gap: 8px; align-items: center; font-size: 12px; }
-        .user-bar input { flex: 1; padding: 8px; background: #000; border: 1px solid var(--main); color: #fff; border-radius: 4px; font-family: monospace; font-size: 12px; }
-        .user-bar button { background: var(--main); color: #000; border: none; padding: 8px 14px; font-weight: bold; border-radius: 4px; cursor: pointer; }
-        .matchmaking-card { background: var(--card); border: 2px solid var(--main); border-radius: 10px; padding: 20px; text-align: center; margin-top: 15px; box-shadow: 0 0 15px rgba(0,242,255,0.2); }
-        .matchmaking-card h3 { margin: 0 0 10px 0; font-size: 16px; color: var(--main); }
-        .btn-fila { background: #00ff88; color: #000; border: none; padding: 12px 25px; font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; text-transform: uppercase; width: 100%; }
-        .btn-fila.cancelar { background: #ff3b30; color: #fff; }
-        .ranking-box { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; padding: 12px; margin-top: 15px; }
-        .ranking-box h4 { margin: 0 0 8px 0; color: #ff5722; font-size: 12px; border-bottom: 1px solid #222; padding-bottom: 6px; }
-        .ranking-item { display: flex; justify-content: space-between; font-size: 11px; padding: 6px 0; border-bottom: 1px dashed #1a1a1a; }
-        #SISTEMA_VIEWPORT { display: none; position: fixed; inset: 0; background: #000; z-index: 99999; }
-        #SISTEMA_CONTAINER { width: 100%; height: 100%; }
-        .BTN-CLOSE { position: absolute; top: 15px; right: 15px; background: #ff0055; color: white; border: none; padding: 8px 15px; cursor: pointer; z-index: 100000; font-weight: bold; border-radius: 5px; }
+        :root { --main: #00f2ff; --bg: #0b0f19; --card: rgba(20, 25, 38, 0.95); }
+        body { background: var(--bg); color: white; font-family: 'Courier New', monospace; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        .card { background: var(--card); border: 2px solid var(--main); border-radius: 12px; padding: 25px; width: 90%; max-width: 380px; box-shadow: 0 0 20px rgba(0,242,255,0.2); text-align: center; }
+        h1 { font-size: 20px; color: var(--main); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .input-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; font-size: 11px; color: #8b9bb4; margin-bottom: 5px; text-transform: uppercase; }
+        input { width: 100%; padding: 12px; background: #07090f; border: 1px solid #23314f; border-radius: 6px; color: #fff; font-size: 14px; outline: none; font-family: monospace; }
+        
+        .btn-acao { background: var(--main); color: #07090f; width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; text-transform: uppercase; font-family: monospace; margin-top: 10px; }
+        .btn-acao:hover { background: #00c2cc; }
     </style>
 </head>
 <body>
 
-    <nav>
-        <div style="font-weight: 900; letter-spacing: 2px; font-size: 13px; color: var(--main);">CORE_OS // CLIENTE</div>
-        <div class="status" id="peer-status">CONECTANDO...</div>
-    </nav>
+    <div class="card">
+        <h1>Entrar na Fila</h1>
+        
+        <div class="input-group">
+            <label>Seu Nick</label>
+            <input type="text" id="nomeUser" value="Player1" maxlength="15">
+        </div>
 
-    <div class="user-bar">
-        <span>👤 Nick:</span>
-        <input type="text" id="input-username" placeholder="Digite seu usuário...">
-        <button onclick="salvarUsername()">Salvar</button>
-    </div>
-
-    <div class="matchmaking-card">
-        <h3>⚔️ ARENA PVP 2D (1v1 REAL)</h3>
-        <p style="font-size: 11px; color: #aaa; margin-bottom: 15px;">Vitória: +150 | Derrota: -10</p>
-        <button id="btn-match" class="btn-fila" onclick="alternarFila()">PROCURAR PARTIDA</button>
-        <div id="status-match" style="margin-top: 12px; font-size: 12px; color: yellow; line-height: 1.4;">Clique em procurar para entrar na fila.</div>
-    </div>
-
-    <div class="ranking-box">
-        <h4>🏆 Placar Global Online</h4>
-        <div id="feed-ranking">Aguardando dados da rede...</div>
-    </div>
-
-    <div id="SISTEMA_VIEWPORT">
-        <button class="BTN-CLOSE" onclick="SHUTDOWN()">✕ SAIR DA PARTIDA</button>
-        <div id="SISTEMA_CONTAINER"></div>
+        <button class="btn-acao" onclick="entrarNaFila()">Entrar na Fila</button>
+        <div id="status" style="font-size:11px; color:#888; margin-top:10px;"></div>
     </div>
 
     <script>
-        const ID_SALA = "pvp-2d-arena-oficial";
-        
-        let peer, conexaoHost;
-        let username = localStorage.getItem('core_os_username') || "";
-        let rankingCache = JSON.parse(localStorage.getItem('pvp_2d_ranking')) || [];
-        let emFila = false;
-        let meuPeerId = "";
+        const MASTER_ID = "core-os-master-hub-2026";
+        let meuPeer;
 
-        document.getElementById('input-username').value = username;
-        if (rankingCache.length > 0) renderizarRanking(rankingCache);
+        function entrarNaFila() {
+            const nome = document.getElementById('nomeUser').value.trim() || "Player";
+            document.getElementById('status').innerText = "Conectando...";
 
-        function salvarUsername() {
-            const val = document.getElementById('input-username').value.trim();
-            if(!val) { alert("Insira um nome válido!"); return; }
-            username = val;
-            localStorage.setItem('core_os_username', username);
-            alert("Nome salvo com sucesso!");
-        }
-
-        function iniciarCliente() {
-            if (peer) { try { peer.destroy(); } catch(e) {} }
-
-            peer = new Peer(undefined, {
+            // Cria um peer para o cliente e se conecta ao Master
+            meuPeer = new Peer({
                 config: { 
                     'iceServers': [
                         { urls: 'stun:stun.l.google.com:19302' },
@@ -87,112 +52,30 @@
                 }
             });
 
-            peer.on('open', (id) => {
-                meuPeerId = id;
-                document.getElementById('peer-status').innerText = "ONLINE - CONECTANDO AO HOST...";
-                conectarAoHost();
+            meuPeer.on('open', (id) => {
+                const masterConn = meuPeer.connect(MASTER_ID);
+
+                masterConn.on('open', () => {
+                    document.getElementById('status').innerText = "Na fila! Aguardando partida...";
+                    masterConn.send({
+                        tipo: "entrar_fila",
+                        peerId: id,
+                        nome: nome
+                    });
+
+                    // Salva localmente para a arena de jogo usar quando iniciar
+                    localStorage.setItem('core_os_username', nome);
+                });
+
+                masterConn.on('error', () => {
+                    document.getElementById('status').innerText = "Erro ao conectar com o Master.";
+                });
             });
 
-            peer.on('error', (err) => {
-                document.getElementById('peer-status').innerText = "ERRO: " + err.type;
-                setTimeout(iniciarCliente, 5000);
+            meuPeer.on('error', (err) => {
+                document.getElementById('status').innerText = "Erro na rede: " + err.type;
             });
         }
-
-        function conectarAoHost() {
-            conexaoHost = peer.connect(ID_SALA);
-
-            conexaoHost.on('open', () => {
-                document.getElementById('peer-status').innerText = "CONECTADO AO HOST ⚡";
-            });
-
-            conexaoHost.on('data', (data) => {
-                if (data.tipo === "ranking") {
-                    rankingCache = data.ranking;
-                    localStorage.setItem('pvp_2d_ranking', JSON.stringify(rankingCache));
-                    renderizarRanking(rankingCache);
-                } else if (data.tipo === "iniciar_partida") {
-                    emFila = false;
-                    atualizarBotaoFilaUI();
-                    document.getElementById('status-match').innerText = "Partida encontrada contra " + data.adversario + "!";
-                    setTimeout(() => BOOT_GAME(data.papel, data.adversario, data.peerIdAdv), 1000);
-                }
-            });
-
-            conexaoHost.on('close', () => {
-                document.getElementById('peer-status').innerText = "HOST CAIU, RECONECTANDO...";
-                setTimeout(conectarAoHost, 4000);
-            });
-
-            conexaoHost.on('error', () => { 
-                document.getElementById('peer-status').innerText = "FALHA NA CONEXÃO. RETENTANDO...";
-                setTimeout(conectarAoHost, 4000); 
-            });
-        }
-
-        function alternarFila() {
-            if (!username) { alert("Defina seu Nickname primeiro!"); return; }
-            if (!conexaoHost || !conexaoHost.open) { alert("Aguardando conexão com o Host..."); return; }
-
-            emFila = !emFila;
-            atualizarBotaoFilaUI();
-
-            if (emFila) {
-                document.getElementById('status-match').innerText = "Entrando na fila... Aguardando oponente.";
-                conexaoHost.send({ tipo: "entrar_fila", usuario: username });
-            } else {
-                document.getElementById('status-match').innerText = "Busca cancelada.";
-                conexaoHost.send({ tipo: "sair_fila" });
-            }
-        }
-
-        function atualizarBotaoFilaUI() {
-            const btn = document.getElementById('btn-match');
-            if (emFila) {
-                btn.innerText = "CANCELAR FILA";
-                btn.className = "btn-fila cancelar";
-            } else {
-                btn.innerText = "PROCURAR PARTIDA";
-                btn.className = "btn-fila";
-                document.getElementById('status-match').innerText = "Busca cancelada.";
-            }
-        }
-
-        window.enviarPontuacaoExterna = function(pontosDelta) {
-            if (conexaoHost && conexaoHost.open) {
-                conexaoHost.send({ tipo: "atualizar_pontos", usuario: username, pontos: pontosDelta });
-            }
-        };
-
-        function renderizarRanking(lista) {
-            const box = document.getElementById('feed-ranking');
-            if(!lista || lista.length === 0) {
-                box.innerHTML = "<div style='color:#555; font-size:11px;'>Nenhum recorde cadastrado.</div>";
-                return;
-            }
-            box.innerHTML = lista.map(r => `
-                <div class="ranking-item">
-                    <span><b>${r.usuario}</b></span>
-                    <span style="color:${r.pontos >= 0 ? '#00ff88' : '#ff3b30'};">${r.pontos} pts</span>
-                </div>
-            `).join('');
-        }
-
-        function BOOT_GAME(papel, adversario, peerIdAdv) {
-            const viewport = document.getElementById('SISTEMA_VIEWPORT');
-            const container = document.getElementById('SISTEMA_CONTAINER');
-            viewport.style.display = 'block';
-            
-            const url = `jogo.html?papel=${papel}&adversario=${encodeURIComponent(adversario)}&peerIdAdv=${peerIdAdv}&meuId=${meuPeerId}`;
-            container.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
-        }
-
-        function SHUTDOWN() {
-            document.getElementById('SISTEMA_VIEWPORT').style.display = 'none';
-            document.getElementById('SISTEMA_CONTAINER').innerHTML = '';
-        }
-
-        iniciarCliente();
     </script>
 </body>
 </html>
