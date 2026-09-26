@@ -55,6 +55,7 @@
         <div id="feed-ranking">Aguardando dados da rede...</div>
     </div>
 
+    <!-- Viewport onde o jogo abre automaticamente ao achar partida -->
     <div id="SISTEMA_VIEWPORT">
         <button class="BTN-CLOSE" onclick="SHUTDOWN()">✕ SAIR DA PARTIDA</button>
         <div id="SISTEMA_CONTAINER"></div>
@@ -65,7 +66,6 @@
         
         let peer, conexaoAtiva;
         let username = localStorage.getItem('core_os_username') || "";
-        // Cache isolado para o PVP 2D no cliente
         let rankingCache = JSON.parse(localStorage.getItem('pvp_2d_ranking')) || [];
         let emFila = false;
 
@@ -162,6 +162,7 @@
             }
         }
 
+        // Função disparada pelo jogo de tiro quando acaba a partida (vitória/derrota)
         window.enviarPontuacaoExterna = function(pontosDelta) {
             if (conexaoAtiva && conexaoAtiva.open) {
                 conexaoAtiva.send({ tipo: "atualizar_pontos", usuario: username, pontos: pontosDelta });
@@ -182,6 +183,7 @@
             `).join('');
         }
 
+        // Abre o jogo de tiro via iframe carregando o arquivo jogo.html
         function BOOT_GAME(adversario) {
             const viewport = document.getElementById('SISTEMA_VIEWPORT');
             const container = document.getElementById('SISTEMA_CONTAINER');
@@ -198,5 +200,4 @@
         iniciarCliente();
     </script>
 </body>
-  </html>
-  
+</html>
