@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Core OS - Arena PVP 2D</title>
+    <title>Core OS - Arena PVP 2D 1v1</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #fff; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; touch-action: none; user-select: none; }
         canvas { display: block; background: #080808; margin: 0 auto; }
@@ -17,7 +18,6 @@
         #overlay-sub { font-size: 13px; color: #aaa; margin-bottom: 20px; }
         .btn-acao { background: #00ff88; color: #000; border: none; padding: 12px 30px; font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-family: monospace; }
         
-        /* Joystick Mobile */
         .joystick-base { position: absolute; bottom: 30px; left: 30px; width: 130px; height: 130px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.15); border-radius: 50%; touch-action: none; z-index: 5; }
         .joystick-stick { position: absolute; top: 40px; left: 40px; width: 50px; height: 50px; background: rgba(0,242,255,0.4); border: 2px solid #00f2ff; border-radius: 50%; pointer-events: none; transition: transform 0.05s linear; }
         
@@ -27,13 +27,13 @@
 <body>
 
     <div id="hud">
-        <div class="hud-p1">VOCÊ (AZUL): <span id="hp-voce">100</span> HP</div>
-        <div class="hud-p2">ADVERSÁRIO (VERMELHO): <span id="hp-adv">100</span> HP</div>
+        <div class="hud-p1"><span id="lbl-p1">Player 1 (Azul)</span>: <span id="hp-p1">100</span> HP</div>
+        <div class="hud-p2"><span id="lbl-p2">Player 2 (Vermelho)</span>: <span id="hp-p2">100</span> HP</div>
     </div>
 
     <div id="tela-overlay">
-        <div id="overlay-msg">CONECTANDO À ARENA</div>
-        <div id="overlay-sub">Preparando o campo de batalha...</div>
+        <div id="overlay-msg">CONECTANDO AO OPONENTE</div>
+        <div id="overlay-sub">Estabelecendo canal PeerJS direto...</div>
         <button id="btn-voltar" class="btn-acao" style="display:none;" onclick="fecharArena()">SAIR DA ARENA</button>
     </div>
 
@@ -57,17 +57,32 @@
         redimensionar();
 
         const urlParams = new URLSearchParams(window.location.search);
-        const adversarioNome = urlParams.get('adversario') || "Adversario";
+        const papel = urlParams.get('papel'); // 'p1' ou 'p2'
+        const adversarioNome = urlParams.get('adversario') || "Adversário";
+        const peerIdAdv = urlParams.get('peerIdAdv');
+        const meuId = urlParams.get('meuId');
         const meuNome = localStorage.getItem('core_os_username') || "Player";
+
+        // Cores fixas: P1 é sempre Azul, P2 é sempre Vermelho
+        let minhaCor = (papel === 'p1') ? '#00f2ff' : '#ff0055';
+        let corAdv = (papel === 'p1') ? '#ff0055' : '#00f2ff';
+
+        if (papel === 'p1') {
+            document.getElementById('lbl-p1').innerText = meuNome + " (Azul)";
+            document.getElementById('lbl-p2').innerText = adversarioNome + " (Vermelho)";
+        } else {
+            document.getElementById('lbl-p1').innerText = adversarioNome + " (Azul)";
+            document.getElementById('lbl-p2').innerText = meuNome + " (Vermelho)";
+        }
 
         let jogoAtivo = false;
         let meuHP = 100;
         let advHP = 100;
 
-        // Posições Iniciais (Jogador 1 Azul e Jogador 2 Vermelho)
-        let playerX = 100;
-        let playerY = canvas.height / 2;
-        let advX = canvas.width - 100;
+        // Posições iniciais fixas (P1 na esquerda, P2 na direita)
+        let meuX = (papel === 'p1') ? 100 : canvas.width - 100;
+        let meuY = canvas.height / 2;
+        let advX = (papel === 'p1') ? canvas.width - 100 : 100;
         let advY = canvas.height / 2;
 
         const raioPlayer = 18;
@@ -80,12 +95,53 @@
             { x: (canvas.width / 4) * 3 - 100, y: canvas.height - 140, w: 100, h: 40 }
         ];
 
-        // Controles Teclado (WASD)
+        // Conexão PeerJS Direta entre os dois jogadores
+        let peerGame = new Peer(meuId);
+        let conexaoP2P = null;
+
+        peerGame.on('open', () => {
+            if (papel === 'p1') {
+                // P1 aguarda conexão do P2
+                peerGame.on('connection', (conn) => {
+                    conexaoP2P = conn;
+                    configurarConexaoP2P();
+                    iniciarContagem();
+                });
+            } else {
+                // P2 conecta ativamente no P1
+                conexaoP2P = peerGame.connect(peerIdAdv);
+                conexaoP2P.on('open', () => {
+                    configurarConexaoP2P();
+                    iniciarContagem();
+                });
+            }
+        });
+
+        function configurarConexaoP2P() {
+            conexaoP2P.on('data', (data) => {
+                if (data.tipo === 'posicao') {
+                    advX = data.x;
+                    advY = data.y;
+                    advHP = data.hp;
+                    if (papel === 'p1') {
+                        document.getElementById('hp-p2').innerText = Math.max(0, advHP);
+                    } else {
+                        document.getElementById('hp-p1').innerText = Math.max(0, advHP);
+                    }
+                } else if (data.tipo === 'tiro') {
+                    balas.push({ x: data.x, y: data.y, vx: data.vx, vy: data.vy, nosso: false });
+                } else if (data.tipo === 'fim_jogo') {
+                    finalizarPartida(data.venceu);
+                }
+            });
+        }
+
+        // Controles de Teclado (WASD)
         const teclas = { w: false, a: false, s: false, d: false };
         window.addEventListener('keydown', (e) => { if (teclas.hasOwnProperty(e.key.toLowerCase())) teclas[e.key.toLowerCase()] = true; });
         window.addEventListener('keyup', (e) => { if (teclas.hasOwnProperty(e.key.toLowerCase())) teclas[e.key.toLowerCase()] = false; });
 
-        // Joystick Touch Corrigido
+        // Joystick Touch
         let jsAtivo = false;
         let jsCentroX = 0, jsCentroY = 0;
         let moveX = 0, moveY = 0;
@@ -129,48 +185,47 @@
             moveY = dy / raioMax;
         }
 
-        // Botão Atirar (Disparo Direcionado para o Inimigo)
+        // Botão Atirar (Disparo Teleguiado para a Posição Atual do Inimigo)
         document.getElementById('btn-fire').addEventListener('pointerdown', () => {
             if (!jogoAtivo) return;
             
-            // Calcula o ângulo exato em direção ao adversário
-            let angulo = Math.atan2(advY - playerY, advX - playerX);
+            let angulo = Math.atan2(advY - meuY, advX - meuX);
             let velocidadeTiro = 9;
+            let vx = Math.cos(angulo) * velocidadeTiro;
+            let vy = Math.sin(angulo) * velocidadeTiro;
 
-            balas.push({
-                x: playerX,
-                y: playerY,
-                vx: Math.cos(angulo) * velocidadeTiro,
-                vy: Math.sin(angulo) * velocidadeTiro,
-                nosso: true
-            });
+            balas.push({ x: meuX, y: meuY, vx: vx, vy: vy, nosso: true });
+
+            if (conexaoP2P && conexaoP2P.open) {
+                conexaoP2P.send({ tipo: 'tiro', x: meuX, y: meuY, vx: vx, vy: vy });
+            }
         });
 
-        // Contagem Regressiva
-        let contador = 3;
-        const overlay = document.getElementById('tela-overlay');
-        const msg = document.getElementById('overlay-msg');
-        const sub = document.getElementById('overlay-sub');
-
         function iniciarContagem() {
-            if (contador > 0) {
-                msg.innerText = contador;
-                sub.innerText = "Preparem-se!";
-                contador--;
-                setTimeout(iniciarContagem, 1000);
-            } else {
-                msg.innerText = "FIGHT!";
-                sub.innerText = "Elimine o oponente!";
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    jogoAtivo = true;
-                }, 700);
-            }
-        }
-        setTimeout(iniciarContagem, 500);
+            let contador = 3;
+            const overlay = document.getElementById('tela-overlay');
+            const msg = document.getElementById('overlay-msg');
+            const sub = document.getElementById('overlay-sub');
 
-        // Verificação de colisão com caixas
-        ellsColideCaixa = function(nx, ny) {
+            function tick() {
+                if (contador > 0) {
+                    msg.innerText = contador;
+                    sub.innerText = "Preparem-se!";
+                    contador--;
+                    setTimeout(tick, 1000);
+                } else {
+                    msg.innerText = "FIGHT!";
+                    sub.innerText = "Elimine o oponente!";
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        jogoAtivo = true;
+                    }, 700);
+                }
+            }
+            tick();
+        }
+
+        function colideCaixa(nx, ny) {
             for (let c of caixas) {
                 if (nx + raioPlayer > c.x && nx - raioPlayer < c.x + c.w &&
                     ny + raioPlayer > c.y && ny - raioPlayer < c.y + c.h) {
@@ -178,19 +233,19 @@
                 }
             }
             return false;
-        };
+        }
 
         // Loop Principal
         function loop() {
             ctx.fillStyle = '#080808';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Desenhar Paredes / Bordas da Arena
+            // Paredes da Arena
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 6;
             ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
-            // Desenhar Caixas Obstáculos
+            // Obstáculos (Caixas)
             ctx.fillStyle = '#1c1c1c';
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
@@ -200,7 +255,6 @@
             }
 
             if (jogoAtivo) {
-                // Movimento via Teclado (WASD)
                 let tecladoX = 0, tecladoY = 0;
                 if (teclas.w) tecladoY = -1;
                 if (teclas.s) tecladoY = 1;
@@ -210,42 +264,28 @@
                 let finalMoveX = moveX !== 0 ? moveX : tecladoX;
                 let finalMoveY = moveY !== 0 ? moveY : tecladoY;
 
-                let proximoX = playerX + finalMoveX * 4.5;
-                let proximoY = playerY + finalMoveY * 4.5;
+                let proximoX = meuX + finalMoveX * 4.5;
+                let proximoY = meuY + finalMoveY * 4.5;
 
-                // Colisão com bordas da tela e caixas
-                if (proximoX > 20 && proximoX < canvas.width - 20 && !ellsColideCaixa(proximoX, playerY)) playerX = proximoX;
-                if (proximoY > 20 && proximoY < canvas.height - 20 && !ellsColideCaixa(playerX, proximoY)) playerY = proximoY;
+                if (proximoX > 20 && proximoX < canvas.width - 20 && !colideCaixa(proximoX, meuY)) meuX = proximoX;
+                if (proximoY > 20 && proximoY < canvas.height - 20 && !colideCaixa(meuX, proximoY)) meuY = proximoY;
 
-                // IA Simples do Adversário Vermelho
-                if (Math.random() < 0.02) {
-                    advX += (Math.random() - 0.5) * 45;
-                    advY += (Math.random() - 0.5) * 45;
-                    advX = Math.max(30, Math.min(canvas.width - 30, advX));
-                    advY = Math.max(30, Math.min(canvas.height - 30, advY));
-                }
-                if (Math.random() < 0.035) {
-                    let anguloAdv = Math.atan2(playerY - advY, playerX - advX);
-                    balas.push({
-                        x: advX, y: advY,
-                        vx: Math.cos(anguloAdv) * 7,
-                        vy: Math.sin(anguloAdv) * 7,
-                        nosso: false
-                    });
+                // Envia dados para o adversário em tempo real
+                if (conexaoP2P && conexaoP2P.open) {
+                    conexaoP2P.send({ tipo: 'posicao', x: meuX, y: meuY, hp: meuHP });
                 }
 
-                // Atualizar Balas e Colisões
+                // Atualizar Balas
                 for (let i = balas.length - 1; i >= 0; i--) {
                     let b = balas[i];
                     b.x += b.vx;
                     b.y += b.vy;
 
-                    ctx.fillStyle = b.nosso ? '#00f2ff' : '#ff0055';
+                    ctx.fillStyle = b.nosso ? minhaCor : corAdv;
                     ctx.beginPath();
                     ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Colisão bala com caixas
                     let colidiuCaixa = false;
                     for (let c of caixas) {
                         if (b.x > c.x && b.x < c.x + c.w && b.y > c.y && b.y < c.y + c.h) {
@@ -259,44 +299,57 @@
                         continue;
                     }
 
-                    // Colisões com jogadores
+                    // Colisão com o adversário (se o tiro for nosso e acertar o adv)
                     if (b.nosso && Math.hypot(b.x - advX, b.y - advY) < raioPlayer) {
                         advHP -= 15;
-                        document.getElementById('hp-adv').innerText = Math.max(0, advHP);
+                        if (papel === 'p1') document.getElementById('hp-p2').innerText = Math.max(0, advHP);
+                        else document.getElementById('hp-p1').innerText = Math.max(0, advHP);
+                        
                         balas.splice(i, 1);
-                        if (advHP <= 0) { finalizarPartida(true); break; }
-                    } else if (!b.nosso && Math.hypot(b.x - playerX, b.y - playerY) < raioPlayer) {
+                        if (advHP <= 0) {
+                            finalizarPartida(true);
+                            if (conexaoP2P && conexaoP2P.open) conexaoP2P.send({ tipo: 'fim_jogo', venceu: false });
+                            break;
+                        }
+                    } 
+                    // Colisão com nós mesmos (se o tiro do adversário nos acertar)
+                    else if (!b.nosso && Math.hypot(b.x - meuX, b.y - meuY) < raioPlayer) {
                         meuHP -= 15;
-                        document.getElementById('hp-voce').innerText = Math.max(0, meuHP);
+                        if (papel === 'p1') document.getElementById('hp-p1').innerText = Math.max(0, meuHP);
+                        else document.getElementById('hp-p2').innerText = Math.max(0, meuHP);
+
                         balas.splice(i, 1);
-                        if (meuHP <= 0) { finalizarPartida(false); break; }
+                        if (meuHP <= 0) {
+                            finalizarPartida(false);
+                            break;
+                        }
                     }
                 }
             }
 
-            // Desenhar Jogador 1 (AZUL)
+            // Desenhar Jogador 1 (SEMPRE AZUL)
+            let x1 = (papel === 'p1') ? meuX : advX;
+            let y1 = (papel === 'p1') ? meuY : advY;
             ctx.fillStyle = '#00f2ff';
-            ctx.beginPath(); 
-            ctx.arc(playerX, playerY, raioPlayer, 0, Math.PI * 2); 
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(x1, y1, raioPlayer, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
 
-            // Desenhar Jogador 2 (VERMELHO)
+            // Desenhar Jogador 2 (SEMPRE VERMELHO)
+            let x2 = (papel === 'p2') ? meuX : advX;
+            let y2 = (papel === 'p2') ? meuY : advY;
             ctx.fillStyle = '#ff0055';
-            ctx.beginPath(); 
-            ctx.arc(advX, advY, raioPlayer, 0, Math.PI * 2); 
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(x2, y2, raioPlayer, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
 
             requestAnimationFrame(loop);
         }
 
         function finalizarPartida(venceu) {
             jogoAtivo = false;
+            const overlay = document.getElementById('tela-overlay');
+            const msg = document.getElementById('overlay-msg');
+            const sub = document.getElementById('overlay-sub');
+            
             overlay.style.display = 'flex';
             document.getElementById('btn-voltar').style.display = 'block';
 
