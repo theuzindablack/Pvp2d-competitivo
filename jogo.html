@@ -13,9 +13,9 @@
         .hud-p1 { color: #00f2ff; }
         .hud-p2 { color: #ff0055; }
 
-        #tela-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; text-align: center; }
-        #overlay-msg { font-size: 28px; color: #ffaa00; margin-bottom: 10px; font-weight: bold; }
-        #overlay-sub { font-size: 13px; color: #aaa; margin-bottom: 20px; }
+        #tela-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; text-align: center; }
+        #overlay-msg { font-size: 24px; color: #ffaa00; margin-bottom: 10px; font-weight: bold; }
+        #overlay-sub { font-size: 12px; color: #aaa; margin-bottom: 20px; padding: 0 20px; }
         .btn-acao { background: #00ff88; color: #000; border: none; padding: 12px 30px; font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-family: monospace; }
         
         .joystick-base { position: absolute; bottom: 30px; left: 30px; width: 130px; height: 130px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.15); border-radius: 50%; touch-action: none; z-index: 5; }
@@ -33,7 +33,7 @@
 
     <div id="tela-overlay">
         <div id="overlay-msg">CONECTANDO AO OPONENTE</div>
-        <div id="overlay-sub">Estabelecendo canal PeerJS direto...</div>
+        <div id="overlay-sub" id="sub-status">Estabelecendo canal PeerJS direto...</div>
         <button id="btn-voltar" class="btn-acao" style="display:none;" onclick="fecharArena()">SAIR DA ARENA</button>
     </div>
 
@@ -63,7 +63,6 @@
         const meuId = urlParams.get('meuId');
         const meuNome = localStorage.getItem('core_os_username') || "Player";
 
-        // Cores fixas: P1 é sempre Azul, P2 é sempre Vermelho
         let minhaCor = (papel === 'p1') ? '#00f2ff' : '#ff0055';
         let corAdv = (papel === 'p1') ? '#ff0055' : '#00f2ff';
 
@@ -79,7 +78,6 @@
         let meuHP = 100;
         let advHP = 100;
 
-        // Posições iniciais fixas (P1 na esquerda, P2 na direita)
         let meuX = (papel === 'p1') ? 100 : canvas.width - 100;
         let meuY = canvas.height / 2;
         let advX = (papel === 'p1') ? canvas.width - 100 : 100;
@@ -88,36 +86,56 @@
         const raioPlayer = 18;
         let balas = [];
 
-        // Caixas de Obstáculos na Arena
         const caixas = [
             { x: canvas.width / 2 - 40, y: canvas.height / 2 - 80, w: 80, h: 160 },
             { x: canvas.width / 4, y: 100, w: 100, h: 40 },
             { x: (canvas.width / 4) * 3 - 100, y: canvas.height - 140, w: 100, h: 40 }
         ];
 
-        // Conexão PeerJS Direta entre os dois jogadores
-        let peerGame = new Peer(meuId);
+        // Inicialização do PeerJS com servidores públicos STUN robustos
+        let peerGame = new Peer(meuId, {
+            config: {
+                'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' }
+                ]
+            }
+        });
         let conexaoP2P = null;
+        let conexaoEstabelecida = false;
 
         peerGame.on('open', () => {
-            if (papel === 'p1') {
-                // P1 aguarda conexão do P2
-                peerGame.on('connection', (conn) => {
-                    conexaoP2P = conn;
-                    configurarConexaoP2P();
-                    iniciarContagem();
-                });
+            if (papel === 'p2') {
+                conectarComOponente();
             } else {
-                // P2 conecta ativamente no P1
-                conexaoP2P = peerGame.connect(peerIdAdv);
-                conexaoP2P.on('open', () => {
-                    configurarConexaoP2P();
-                    iniciarContagem();
-                });
+                document.getElementById('overlay-sub').innerText = "Aguardando o oponente conectar na sala...";
             }
         });
 
+        peerGame.on('connection', (conn) => {
+            conexaoP2P = conn;
+            configurarConexaoP2P();
+        });
+
+        function conectarComOponente() {
+            if (conexaoEstabelecida) return;
+            document.getElementById('overlay-sub').innerText = "Conectando ao oponente (" + peerIdAdv + ")...";
+            
+            conexaoP2P = peerGame.connect(peerIdAdv, { reliable: true });
+
+            conexaoP2P.on('open', () => {
+                configurarConexaoP2P();
+            });
+
+            conexaoP2P.on('error', () => {
+                setTimeout(conectarComOponente, 2000); // Tenta de novo se falhar
+            });
+        }
+
         function configurarConexaoP2P() {
+            if (conexaoEstabelecida) return;
+            conexaoEstabelecida = true;
+
             conexaoP2P.on('data', (data) => {
                 if (data.tipo === 'posicao') {
                     advX = data.x;
@@ -134,7 +152,16 @@
                     finalizarPartida(data.venceu);
                 }
             });
+
+            iniciarContagemRegressiva();
         }
+
+        // Timeout de segurança: se demorar mais de 10 segundos, avisa o usuário
+        setTimeout(() => {
+            if (!conexaoEstabelecida) {
+                document.getElementById('overlay-sub').innerText = "Demorando para conectar. Verifique se o oponente está na mesma rede/sala.";
+            }
+        }, 10000);
 
         // Controles de Teclado (WASD)
         const teclas = { w: false, a: false, s: false, d: false };
@@ -185,7 +212,6 @@
             moveY = dy / raioMax;
         }
 
-        // Botão Atirar (Disparo Teleguiado para a Posição Atual do Inimigo)
         document.getElementById('btn-fire').addEventListener('pointerdown', () => {
             if (!jogoAtivo) return;
             
@@ -201,7 +227,7 @@
             }
         });
 
-        function iniciarContagem() {
+        function iniciarContagemRegressiva() {
             let contador = 3;
             const overlay = document.getElementById('tela-overlay');
             const msg = document.getElementById('overlay-msg');
@@ -219,7 +245,7 @@
                     setTimeout(() => {
                         overlay.style.display = 'none';
                         jogoAtivo = true;
-                    }, 700);
+                    }, 600);
                 }
             }
             tick();
@@ -235,17 +261,14 @@
             return false;
         }
 
-        // Loop Principal
         function loop() {
             ctx.fillStyle = '#080808';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Paredes da Arena
             ctx.strokeStyle = '#222';
             ctx.lineWidth = 6;
             ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
-            // Obstáculos (Caixas)
             ctx.fillStyle = '#1c1c1c';
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
@@ -270,12 +293,10 @@
                 if (proximoX > 20 && proximoX < canvas.width - 20 && !colideCaixa(proximoX, meuY)) meuX = proximoX;
                 if (proximoY > 20 && proximoY < canvas.height - 20 && !colideCaixa(meuX, proximoY)) meuY = proximoY;
 
-                // Envia dados para o adversário em tempo real
                 if (conexaoP2P && conexaoP2P.open) {
                     conexaoP2P.send({ tipo: 'posicao', x: meuX, y: meuY, hp: meuHP });
                 }
 
-                // Atualizar Balas
                 for (let i = balas.length - 1; i >= 0; i--) {
                     let b = balas[i];
                     b.x += b.vx;
@@ -299,7 +320,6 @@
                         continue;
                     }
 
-                    // Colisão com o adversário (se o tiro for nosso e acertar o adv)
                     if (b.nosso && Math.hypot(b.x - advX, b.y - advY) < raioPlayer) {
                         advHP -= 15;
                         if (papel === 'p1') document.getElementById('hp-p2').innerText = Math.max(0, advHP);
@@ -312,7 +332,6 @@
                             break;
                         }
                     } 
-                    // Colisão com nós mesmos (se o tiro do adversário nos acertar)
                     else if (!b.nosso && Math.hypot(b.x - meuX, b.y - meuY) < raioPlayer) {
                         meuHP -= 15;
                         if (papel === 'p1') document.getElementById('hp-p1').innerText = Math.max(0, meuHP);
@@ -327,14 +346,12 @@
                 }
             }
 
-            // Desenhar Jogador 1 (SEMPRE AZUL)
             let x1 = (papel === 'p1') ? meuX : advX;
             let y1 = (papel === 'p1') ? meuY : advY;
             ctx.fillStyle = '#00f2ff';
             ctx.beginPath(); ctx.arc(x1, y1, raioPlayer, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
 
-            // Desenhar Jogador 2 (SEMPRE VERMELHO)
             let x2 = (papel === 'p2') ? meuX : advX;
             let y2 = (papel === 'p2') ? meuY : advY;
             ctx.fillStyle = '#ff0055';
