@@ -1,128 +1,462 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Core OS - Master Oche (Hub PvP)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Core OS - Arena PvP Ranglist</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #050505; color: #00ff88; font-family: 'Courier New', monospace; padding: 20px; margin: 0; }
-        .container { max-width: 600px; margin: 0 auto; background: #111; border: 2px solid #00ff88; border-radius: 8px; padding: 20px; box-shadow: 0 0 20px rgba(0,255,136,0.15); }
-        h1 { font-size: 18px; text-transform: uppercase; margin-top: 0; border-bottom: 1px solid #222; padding-bottom: 10px; }
-        .log-box { background: #000; border: 1px solid #222; border-radius: 4px; padding: 10px; height: 300px; overflow-y: auto; font-size: 12px; color: #ccc; margin-top: 15px; }
-        .status { font-weight: bold; margin-bottom: 10px; font-size: 13px; }
+        :root { --main: #00ff88; --bg: #050505; --card: #111; }
+        body { background: var(--bg); color: white; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; user-select: none; touch-action: none; }
+        
+        #lobby { display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; gap: 15px; }
+        .card { background: var(--card); border: 2px solid var(--main); border-radius: 8px; padding: 20px; width: 320px; text-align: center; box-shadow: 0 0 15px rgba(0,255,136,0.1); }
+        h2 { color: var(--main); font-size: 16px; margin-top: 0; letter-spacing: 1px; }
+        label { display: block; font-size: 11px; color: #888; text-align: left; margin-bottom: 5px; text-transform: uppercase; }
+        input { width: 100%; padding: 12px; background: #000; border: 1px solid #222; border-radius: 4px; color: #fff; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; font-family: monospace; outline: none; }
+        input:disabled { opacity: 0.6; }
+        button { width: 100%; padding: 12px; background: var(--main); color: #050505; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-family: monospace; font-size: 13px; }
+        .sair { background: #ff3366 !important; color: #fff !important; }
+
+        #jogo { display: none; position: fixed; inset: 0; background: #050505; }
+        #hud { position: absolute; top: 15px; width: 100%; text-align: center; font-size: 13px; font-weight: bold; z-index: 10; pointer-events: none; text-shadow: 0 0 4px #000; }
+        .overlay { display: none; position: absolute; inset: 0; background: rgba(5, 5, 5, 0.95); z-index: 200; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        
+        #J_BASE { position: absolute; bottom: 30px; left: 30px; width: 110px; height: 110px; background: rgba(255,255,255,0.03); border: 2px solid rgba(255,255,255,0.15); border-radius: 50%; z-index: 100; }
+        #J_STICK { position: absolute; top: 30px; left: 30px; width: 50px; height: 50px; background: rgba(0,255,136,0.8); border-radius: 50%; pointer-events: none; }
+        #B_SHOOT { position: absolute; bottom: 30px; right: 30px; width: 90px; height: 90px; background: #ff0055; border: 3px solid #fff; border-radius: 50%; color: white; font-weight: bold; z-index: 100; display: flex; align-items: center; justify-content: center; text-transform: uppercase; font-size: 12px; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Central Oche Hub (Matchmaking)</h1>
-        <div id="status-rede" class="status">Status: Iniciando Hub Central...</div>
-        <p style="font-size: 11px; color: #888;">ID Fixo Ativo: <b style="color: #fff;">core-os-oche-master-hub-2026</b></p>
-        
-        <div style="font-size: 11px; text-transform: uppercase; color: #666; margin-top: 15px;">Log de Atividades da Fila:</div>
-        <div id="logs" class="log-box"></div>
+    <div id="lobby">
+        <div class="card">
+            <h2>FILA PVP 2D</h2>
+            <div style="text-align:left;"><label>Seu Nick</label></div>
+            <input type="text" id="nome" value="Player" maxlength="12">
+            <button id="btn" onclick="toggleFila()">Entrar na Fila</button>
+            <p id="st" style="font-size:11px; color:#888; margin-top:12px;">Pronto para entrar.</p>
+        </div>
+    </div>
+
+    <div id="jogo">
+        <div id="hud">
+            <span id="txt-status" style="color: var(--main);">Conectando à partida...</span><br>
+            <span id="txt-placar" style="font-size: 15px; letter-spacing: 2px; color: #fff;">PLACAR: <b>0 x 0</b></span><br>
+            <span id="txt-hp" style="font-size: 11px; color: #888;">SEU HP: 3/3 | ADVERSÁRIO HP: 3/3</span>
+        </div>
+
+        <div id="win" class="overlay" style="color:var(--main);">
+            <h1 id="txt-fim">VITÓRIA DA PARTIDA! 🏆</h1>
+            <p id="txt-ganho-pts" style="font-size:14px; margin-bottom:20px;"></p>
+            <button style="width:auto; padding:10px 25px; background:var(--main); color:#050505; border:none; font-weight:bold; cursor:pointer;" onclick="location.reload()">Voltar ao Lobby</button>
+        </div>
+
+        <div id="J_BASE"><div id="J_STICK"></div></div>
+        <div id="B_SHOOT">ATIRAR</div>
+        <canvas id="cv"></canvas>
     </div>
 
     <script>
         const ID_FIXO_OCHE = "core-os-oche-master-hub-2026";
-        let masterPeer = null;
-        let filaEspera = [];
+        let meuPeer = null, masterConn = null, naFila = false;
+        let peerJogo = null, connJogo = null, ativo = false;
+        
+        let meuX = 0, meuY = 0, advX = 0, advY = 0;
+        let meuHp = 3, advHp = 3;
+        let meusGols = 0, golsAdv = 0;
+        let moveX = 0, moveY = 0;
+        let balas = [];
+        let minhaCor = '#00ff88', corAdv = '#ff0055';
+        let meuNome = 'Player', nomeAdv = 'Oponente';
+        let meuPapel = '';
+        let resultadoEnviado = false;
+        let salaJogoIdGlobal = '';
+        let reconnectInterval = null;
 
-        function log(msg) {
-            const box = document.getElementById('logs');
-            const hora = new Date().toLocaleTimeString();
-            box.innerHTML += `[${hora}] ${msg}<br>`;
-            box.scrollTop = box.scrollHeight;
+        function toggleFila() {
+            const btn = document.getElementById('btn');
+            const st = document.getElementById('st');
+            const txtNome = document.getElementById('nome');
+
+            if (!naFila) {
+                meuNome = txtNome.value.trim() || "Player";
+                st.innerText = "Conectando ao Oche...";
+                btn.disabled = true;
+
+                conectarFilaComReconexao(st, btn, txtNome);
+            } else {
+                if (reconnectInterval) clearInterval(reconnectInterval);
+                if (masterConn) masterConn.close();
+                if (meuPeer) meuPeer.destroy();
+                naFila = false;
+                st.innerText = "Saiu da fila.";
+                btn.innerText = "Entrar na Fila";
+                btn.className = "";
+                txtNome.disabled = false;
+            }
         }
 
-        function iniciarOcheHub() {
-            log("Conectando o Hub Central com ID fixo...");
-            
-            // Destroi anterior se existir
-            if (masterPeer) {
-                try { masterPeer.destroy(); } catch(e){}
-            }
+        function conectarFilaComReconexao(st, btn, txtNome) {
+            meuPeer = new Peer();
 
-            masterPeer = new Peer(ID_FIXO_OCHE);
-
-            masterPeer.on('open', (id) => {
-                document.getElementById('status-rede').innerHTML = `Status: <span style="color: #00ff88;">ONLINE (Ouvindo conexões)</span>`;
-                log(`Hub pronto! ID fixo registrado com sucesso: ${id}`);
+            meuPeer.on('open', (id) => {
+                tentativaConectarFila(id, st, btn, txtNome);
             });
 
-            masterPeer.on('connection', (conn) => {
-                conn.on('data', (data) => {
-                    if (!data) return;
-
-                    // 1. Jogador entrou na fila
-                    if (data.tipo === 'entrar_fila') {
-                        log(`Novo player na fila: <b>${data.nome}</b> (PeerID: ${data.peerId})`);
-                        
-                        // Evita duplicata do mesmo PeerID
-                        filaEspera = filaEspera.filter(p => p.peerId !== data.peerId);
-                        filaEspera.push({ peerId: data.peerId, nome: data.nome, conn: conn });
-
-                        checarMatchmaking();
-                    }
-
-                    // 2. Resultado de partida finalizado
-                    if (data.tipo === 'fim_partida_resultado') {
-                        log(`🏆 Fim de partida reportado! Vencedor: <b>${data.vencedor}</b> | Perdedor: ${data.perdedor}`);
-                    }
-                });
-
-                conn.on('close', () => {
-                    // Remove da fila caso o player feche a página enquanto espera
-                    filaEspera = filaEspera.filter(p => p.conn !== conn);
-                });
-            });
-
-            masterPeer.on('error', (err) => {
-                log(`Erro no Hub: ${err.type}`);
-                if (err.type === 'unavailable-id') {
-                    document.getElementById('status-rede').innerHTML = `Status: <span style="color: #ff3366;">ERRO: ID já está em uso em outra aba!</span>`;
-                    log("Já existe outra aba do Oche aberta. Feche-a para usar esta.");
-                } else {
-                    // Tenta reiniciar automaticamente após 3 segundos se cair
-                    setTimeout(iniciarOcheHub, 3000);
+            meuPeer.on('error', () => {
+                if (naFila) {
+                    st.innerText = "Queda detectada. Reconectando...";
+                    reconnectInterval = setTimeout(() => {
+                        try { meuPeer.destroy(); } catch(e){}
+                        conectarFilaComReconexao(st, btn, txtNome);
+                    }, 3000);
                 }
             });
         }
 
-        function checarMatchmaking() {
-            if (filaEspera.length >= 2) {
-                let p1 = filaEspera.shift();
-                let p2 = filaEspera.shift();
+        function tentativaConectarFila(id, st, btn, txtNome) {
+            masterConn = meuPeer.connect(ID_FIXO_OCHE);
+            
+            masterConn.on('open', () => {
+                naFila = true;
+                st.innerText = "Na fila! Aguardando oponente...";
+                btn.innerText = "Sair da Fila";
+                btn.className = "sair";
+                btn.disabled = false;
+                txtNome.disabled = true;
 
-                let salaJogoId = 'sala-pvp-' + Math.random().toString(36).substr(2, 9);
-                log(`Match encontrado! ⚔️ <b>${p1.nome}</b> vs <b>${p2.nome}</b> | Sala: ${salaJogoId}`);
+                masterConn.send({ tipo: "entrar_fila", peerId: id, nome: meuNome });
+            });
 
-                // O p1 vira o HOST da partida, o p2 vira o CLIENTE
-                try {
-                    p1.conn.send({
-                        tipo: 'iniciar_partida',
-                        papel: 'host',
-                        adversario: p2.nome,
-                        salaJogoId: salaJogoId
-                    });
-                } catch(e) { log(`Erro ao enviar comando para ${p1.nome}`); }
+            masterConn.on('close', () => {
+                if (naFila && !ativo) {
+                    st.innerText = "Conexão perdida com o Oche. Tentando reconectar...";
+                    setTimeout(() => tentativaConectarFila(id, st, btn, txtNome), 3000);
+                }
+            });
 
-                try {
-                    p2.conn.send({
-                        tipo: 'iniciar_partida',
-                        papel: 'cliente',
-                        adversario: p1.nome,
-                        salaJogoId: salaJogoId
-                    });
-                } catch(e) { log(`Erro ao enviar comando para ${p2.nome}`); }
+            masterConn.on('error', () => {
+                if (naFila && !ativo) {
+                    st.innerText = "Erro no túnel. Reconectando...";
+                }
+            });
+
+            masterConn.on('data', (data) => {
+                if (data && data.tipo === "iniciar_partida") {
+                    if (masterConn) masterConn.close();
+                    if (meuPeer) meuPeer.destroy();
+
+                    nomeAdv = data.adversario;
+                    meuPapel = data.papel;
+                    salaJogoIdGlobal = data.salaJogoId;
+                    iniciarArena(data.papel, data.salaJogoId);
+                }
+            });
+        }
+
+        function iniciarArena(papel, salaId) {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('jogo').style.display = 'block';
+
+            const cv = document.getElementById('cv');
+            const ctx = cv.getContext('2d');
+            function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; }
+            window.onresize = resize;
+            resize();
+
+            if (papel === 'host') {
+                minhaCor = '#00ff88'; corAdv = '#ff0055';
+                meuX = cv.width / 2 - 16; meuY = cv.height - 120;
+                advX = cv.width / 2 - 16; advY = 100;
             } else {
-                log(`Fila atual: ${filaEspera.length} jogador(es) aguardando...`);
+                minhaCor = '#ff0055'; corAdv = '#00ff88';
+                meuX = cv.width / 2 - 16; meuY = 100;
+                advX = cv.width / 2 - 16; advY = cv.height - 120;
+            }
+
+            conectarPartidaComReconexao(papel, salaId);
+
+            const base = document.getElementById('J_BASE'), stick = document.getElementById('J_STICK');
+            let tId = null;
+
+            base.addEventListener('touchstart', (e) => {
+                if (!ativo) return;
+                tId = e.touches[0].identifier;
+                moverJoystick(e.touches[0], base, stick);
+            });
+            base.addEventListener('touchmove', (e) => {
+                if (!ativo) return;
+                for (let i = 0; i < e.touches.length; i++) {
+                    if (e.touches[i].identifier === tId) moverJoystick(e.touches[i], base, stick);
+                }
+            });
+            function resetJ() { stick.style.transform = "translate(0,0)"; moveX = 0; moveY = 0; tId = null; }
+            base.addEventListener('touchend', resetJ);
+            base.addEventListener('touchcancel', resetJ);
+
+            document.getElementById('B_SHOOT').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (!ativo) return;
+
+                let bx = meuX + 14, by = meuY;
+                let ang = Math.atan2((advY + 16) - by, (advX + 16) - bx);
+                let velocidadeBala = 12;
+                let bvx = Math.cos(ang) * velocidadeBala;
+                let bvy = Math.sin(ang) * velocidadeBala;
+
+                balas.push({ x: bx, y: by, vx: bvx, vy: bvy, deMim: true });
+                if (connJogo && connJogo.open) {
+                    connJogo.send({ tipo: 'atirar', x: bx, y: by, vx: bvx, vy: bvy });
+                }
+            });
+
+            function loop() {
+                update(cv);
+                draw(cv, ctx);
+                requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        function conectarPartidaComReconexao(papel, salaId) {
+            peerJogo = new Peer((papel === 'host') ? salaId : undefined);
+
+            peerJogo.on('open', () => {
+                if (papel === 'cliente') {
+                    document.getElementById('txt-status').innerText = `Conectando com ${nomeAdv}...`;
+                    tentarConectarAoHostDaPartida(salaId);
+                } else {
+                    document.getElementById('txt-status').innerText = `Aguardando ${nomeAdv}...`;
+                }
+            });
+
+            peerJogo.on('connection', (c) => {
+                if (papel === 'host') {
+                    connJogo = c;
+                    configurarJogoEventos();
+                }
+            });
+
+            peerJogo.on('error', () => {
+                if (!ativo) {
+                    setTimeout(() => {
+                        try { peerJogo.destroy(); } catch(e){}
+                        conectarPartidaComReconexao(papel, salaId);
+                    }, 3000);
+                }
+            });
+        }
+
+        function tentarConectarAoHostDaPartida(salaId) {
+            if (ativo) return;
+            connJogo = peerJogo.connect(salaId);
+
+            connJogo.on('open', () => {
+                configurarJogoEventos();
+            });
+
+            connJogo.on('close', () => {
+                if (!ativo) {
+                    document.getElementById('txt-status').style.display = 'block';
+                    document.getElementById('txt-status').innerText = "Conexão perdida. Reconectando à partida...";
+                    setTimeout(() => tentarConectarAoHostDaPartida(salaId), 3000);
+                }
+            });
+
+            connJogo.on('error', () => {
+                setTimeout(() => tentarConectarAoHostDaPartida(salaId), 3000);
+            });
+        }
+
+        function configurarJogoEventos() {
+            document.getElementById('txt-status').style.display = 'none';
+            connJogo.send({ tipo: 'nick', nome: meuNome });
+            ativo = true;
+
+            connJogo.on('data', (d) => {
+                if (d.tipo === 'nick') {
+                    nomeAdv = d.nome;
+                } else if (d.tipo === 'posicao') {
+                    advX = window.innerWidth - d.x - 32;
+                    advY = window.innerHeight - d.y - 32;
+                } else if (d.tipo === 'atirar') {
+                    balas.push({ 
+                        x: window.innerWidth - d.x - 4, 
+                        y: window.innerHeight - d.y, 
+                        vx: -d.vx, 
+                        vy: -d.vy, 
+                        deMim: false 
+                    });
+                } else if (d.tipo === 'dano') {
+                    meuHp = d.hpRestante;
+                    atualizarUI();
+                    if (meuHp <= 0) {
+                        golsAdv++;
+                        checarFimRodada();
+                    }
+                }
+            });
+
+            connJogo.on('close', () => {
+                if (golsAdv < 2 && meusGols < 2) {
+                    ativo = false;
+                    document.getElementById('txt-status').style.display = 'block';
+                    document.getElementById('txt-status').innerText = "Adversário desconectou. Tentando reconectar...";
+                    setTimeout(() => tentarConectarAoHostDaPartida(salaJogoIdGlobal), 3000);
+                }
+            });
+        }
+
+        function moverJoystick(t, base, stick) {
+            const rect = base.getBoundingClientRect();
+            let dx = t.clientX - (rect.left + 55), dy = t.clientY - (rect.top + 55);
+            let dist = Math.min(Math.sqrt(dx*dx + dy*dy), 40), ang = Math.atan2(dy, dx);
+            stick.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
+            moveX = (Math.cos(ang) * dist) / 40;
+            moveY = (Math.sin(ang) * dist) / 40;
+        }
+
+        function atualizarUI() {
+            document.getElementById('txt-placar').innerHTML = `PLACAR: <b>${meusGols} x ${golsAdv}</b>`;
+            document.getElementById('txt-hp').innerHTML = `SEU HP: ${meuHp}/3 | ADVERSÁRIO HP: ${advHp}/3`;
+        }
+
+        function reiniciarRodada() {
+            meuHp = 3;
+            advHp = 3;
+            if (meuPapel === 'host') {
+                meuX = window.innerWidth / 2 - 16; meuY = window.innerHeight - 120;
+                advX = window.innerWidth / 2 - 16; advY = 100;
+            } else {
+                meuX = window.innerWidth / 2 - 16; meuY = 100;
+                advX = window.innerWidth / 2 - 16; advY = window.innerHeight - 120;
+            }
+            balas = [];
+            atualizarUI();
+        }
+
+        function checarFimRodada() {
+            if (golsAdv >= 2 || meusGols >= 2) {
+                ativo = false;
+                let ganhou = meusGols > golsAdv;
+                document.getElementById('win').style.display = 'flex';
+                let txtFim = document.getElementById('txt-fim');
+                let txtPts = document.getElementById('txt-ganho-pts');
+
+                if (ganhou) {
+                    txtFim.innerText = "VITÓRIA DA PARTIDA! 🏆";
+                    txtFim.style.color = "#00ff88";
+                    txtPts.innerText = "+150 Pontos Globais Adicionados!";
+                } else {
+                    txtFim.innerText = "DERROTA NA PARTIDA! 💀";
+                    txtFim.style.color = "#ff3366";
+                    txtPts.innerText = "-10 Pontos Globais (Penalidade)";
+                }
+
+                if (!resultadoEnviado) {
+                    resultadoEnviado = true;
+                    let vencedor = ganhou ? meuNome : nomeAdv;
+                    let perdedor = ganhou ? nomeAdv : meuNome;
+                    
+                    enviarResultadoComReconexao(vencedor, perdedor);
+                }
+            } else {
+                reiniciarRodada();
             }
         }
 
-        // Iniciar ao carregar
-        iniciarOcheHub();
-    </script>
-</body>
-</html>
+        function enviarResultadoComReconexao(vencedor, perdedor) {
+            let reportPeer = new Peer();
+            reportPeer.on('open', () => {
+                let reportConn = reportPeer.connect(ID_FIXO_OCHE);
+                reportConn.on('open', () => {
+                    reportConn.send({ tipo: 'fim_partida_resultado', vencedor: vencedor, perdedor: perdedor });
+                    setTimeout(() => reportPeer.destroy(), 1000);
+                });
+                reportConn.on('error', () => {
+                    setTimeout(() => enviarResultadoComReconexao(vencedor, perdedor), 2000);
+                });
+            });
+        }
+
+        function getObstaculos(cv) {
+            return [
+                {x: 40, y: 80, w: 100, h: 25},
+                {x: cv.width - 140, y: 80, w: 100, h: 25},
+                {x: cv.width / 2 - 60, y: cv.height / 2 - 15, w: 120, h: 30},
+                {x: 40, y: cv.height - 105, w: 100, h: 25},
+                {x: cv.width - 140, y: cv.height - 105, w: 100, h: 25}
+            ];
+        }
+
+        function colidiu(nx, ny, obs, cv) {
+            if (nx < 20 || nx > cv.width - 52 || ny < 20 || ny > cv.height - 52) return true;
+            for (let o of obs) {
+                if (nx < o.x + o.w && nx + 32 > o.x && ny < o.y + o.h && ny + 32 > o.y) return true;
+            }
+            return false;
+        }
+
+        function update(cv) {
+            if (!ativo) return;
+
+            let obs = getObstaculos(cv);
+            let proxX = meuX + (moveX * 4.5);
+            let proxY = meuY + (moveY * 4.5);
+
+            if (!colidiu(proxX, meuY, obs, cv)) meuX = proxX;
+            if (!colidiu(meuX, proxY, obs, cv)) meuY = proxY;
+
+            if (connJogo && connJogo.open) {
+                connJogo.send({ tipo: 'posicao', x: meuX, y: meuY });
+            }
+
+            for (let i = balas.length - 1; i >= 0; i--) {
+                let b = balas[i];
+                b.x += b.vx; b.y += b.vy;
+
+                let bateuNaParede = false;
+                for (let o of obs) {
+                    if (b.x >= o.x && b.x <= o.x + o.w && b.y >= o.y && b.y <= o.y + o.h) {
+                        bateuNaParede = true;
+                        break;
+                    }
+                }
+                if (bateuNaParede || b.y < 0 || b.y > cv.height || b.x < 0 || b.x > cv.width) {
+                    balas.splice(i, 1);
+                    continue;
+                }
+
+                if (b.deMim && Math.abs(b.x - advX) < 32 && Math.abs(b.y - advY) < 32) {
+                    balas.splice(i, 1);
+                    advHp--;
+                    if (connJogo && connJogo.open) connJogo.send({ tipo: 'dano', hpRestante: advHp });
+                    
+                    if (advHp <= 0) {
+                        meusGols++;
+                        checarFimRodada();
+                    }
+                    continue;
+                }
+            }
+        }
+
+        function draw(cv, ctx) {
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, cv.width, cv.height);
+
+            let obs = getObstaculos(cv);
+            ctx.fillStyle = '#141414';
+            ctx.strokeStyle = '#262626';
+            ctx.lineWidth = 2;
+            for (let o of obs) {
+                ctx.fillRect(o.x, o.y, o.w, o.h);
+                ctx.strokeRect(o.x, o.y, o.w, o.h);
+            }
+
+            ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.setLineDash([6,6]);
+            ctx.beginPath(); ctx.moveTo(0, cv.height/2); ctx.lineTo(cv.width, cv.height/2); ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = minha
