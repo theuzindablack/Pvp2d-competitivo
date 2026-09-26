@@ -8,23 +8,18 @@
     <style>
         :root { --main: #00f2ff; --bg: #050505; --card: #111; --neon: #0f0; }
         body { background: var(--bg); color: white; font-family: 'Courier New', monospace; margin: 0; padding: 12px; }
-        
         nav { border-bottom: 2px solid var(--main); padding: 12px 15px; display: flex; justify-content: space-between; background: #000; align-items: center; }
         .status { color: var(--neon); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
-
         .user-bar { background: #111; border: 1px solid #333; padding: 12px; border-radius: 8px; margin: 12px 0; display: flex; gap: 8px; align-items: center; font-size: 12px; }
         .user-bar input { flex: 1; padding: 8px; background: #000; border: 1px solid var(--main); color: #fff; border-radius: 4px; font-family: monospace; font-size: 12px; }
         .user-bar button { background: var(--main); color: #000; border: none; padding: 8px 14px; font-weight: bold; border-radius: 4px; cursor: pointer; }
-
         .matchmaking-card { background: var(--card); border: 2px solid var(--main); border-radius: 10px; padding: 20px; text-align: center; margin-top: 15px; box-shadow: 0 0 15px rgba(0,242,255,0.2); }
         .matchmaking-card h3 { margin: 0 0 10px 0; font-size: 16px; color: var(--main); }
         .btn-fila { background: #00ff88; color: #000; border: none; padding: 12px 25px; font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; text-transform: uppercase; width: 100%; }
         .btn-fila.cancelar { background: #ff3b30; color: #fff; }
-
         .ranking-box { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; padding: 12px; margin-top: 15px; }
         .ranking-box h4 { margin: 0 0 8px 0; color: #ff5722; font-size: 12px; border-bottom: 1px solid #222; padding-bottom: 6px; }
         .ranking-item { display: flex; justify-content: space-between; font-size: 11px; padding: 6px 0; border-bottom: 1px dashed #1a1a1a; }
-
         #SISTEMA_VIEWPORT { display: none; position: fixed; inset: 0; background: #000; z-index: 99999; }
         #SISTEMA_CONTAINER { width: 100%; height: 100%; }
         .BTN-CLOSE { position: absolute; top: 15px; right: 15px; background: #ff0055; color: white; border: none; padding: 8px 15px; cursor: pointer; z-index: 100000; font-weight: bold; border-radius: 5px; }
@@ -44,8 +39,8 @@
     </div>
 
     <div class="matchmaking-card">
-        <h3>⚔️ ARENA PVP 2D</h3>
-        <p style="font-size: 11px; color: #aaa; margin-bottom: 15px;">Vitória: +150 | Derrota: -10 (Pode ficar devendo)</p>
+        <h3>⚔️ ARENA PVP 2D (1v1 REAL)</h3>
+        <p style="font-size: 11px; color: #aaa; margin-bottom: 15px;">Vitória: +150 | Derrota: -10</p>
         <button id="btn-match" class="btn-fila" onclick="alternarFila()">PROCURAR PARTIDA</button>
         <div id="status-match" style="margin-top: 12px; font-size: 12px; color: yellow; line-height: 1.4;">Clique em procurar para entrar na fila.</div>
     </div>
@@ -55,7 +50,6 @@
         <div id="feed-ranking">Aguardando dados da rede...</div>
     </div>
 
-    <!-- Viewport onde o jogo abre automaticamente ao achar partida -->
     <div id="SISTEMA_VIEWPORT">
         <button class="BTN-CLOSE" onclick="SHUTDOWN()">✕ SAIR DA PARTIDA</button>
         <div id="SISTEMA_CONTAINER"></div>
@@ -64,10 +58,11 @@
     <script>
         const ID_SALA = "pvp-2d-arena-oficial";
         
-        let peer, conexaoAtiva;
+        let peer, conexaoHost;
         let username = localStorage.getItem('core_os_username') || "";
         let rankingCache = JSON.parse(localStorage.getItem('pvp_2d_ranking')) || [];
         let emFila = false;
+        let meuPeerId = "";
 
         document.getElementById('input-username').value = username;
         if (rankingCache.length > 0) renderizarRanking(rankingCache);
@@ -92,7 +87,8 @@
                 }
             });
 
-            peer.on('open', () => {
+            peer.on('open', (id) => {
+                meuPeerId = id;
                 document.getElementById('peer-status').innerText = "ONLINE - CONECTANDO AO HOST...";
                 conectarAoHost();
             });
@@ -104,13 +100,13 @@
         }
 
         function conectarAoHost() {
-            conexaoAtiva = peer.connect(ID_SALA);
+            conexaoHost = peer.connect(ID_SALA);
 
-            conexaoAtiva.on('open', () => {
+            conexaoHost.on('open', () => {
                 document.getElementById('peer-status').innerText = "CONECTADO AO HOST ⚡";
             });
 
-            conexaoAtiva.on('data', (data) => {
+            conexaoHost.on('data', (data) => {
                 if (data.tipo === "ranking") {
                     rankingCache = data.ranking;
                     localStorage.setItem('pvp_2d_ranking', JSON.stringify(rankingCache));
@@ -119,16 +115,16 @@
                     emFila = false;
                     atualizarBotaoFilaUI();
                     document.getElementById('status-match').innerText = "Partida encontrada contra " + data.adversario + "!";
-                    setTimeout(() => BOOT_GAME(data.adversario), 1000);
+                    setTimeout(() => BOOT_GAME(data.papel, data.adversario, data.peerIdAdv), 1000);
                 }
             });
 
-            conexaoAtiva.on('close', () => {
+            conexaoHost.on('close', () => {
                 document.getElementById('peer-status').innerText = "HOST CAIU, RECONECTANDO...";
                 setTimeout(conectarAoHost, 4000);
             });
 
-            conexaoAtiva.on('error', () => { 
+            conexaoHost.on('error', () => { 
                 document.getElementById('peer-status').innerText = "FALHA NA CONEXÃO. RETENTANDO...";
                 setTimeout(conectarAoHost, 4000); 
             });
@@ -136,17 +132,17 @@
 
         function alternarFila() {
             if (!username) { alert("Defina seu Nickname primeiro!"); return; }
-            if (!conexaoAtiva || !conexaoAtiva.open) { alert("Aguardando conexão com o Host..."); return; }
+            if (!conexaoHost || !conexaoHost.open) { alert("Aguardando conexão com o Host..."); return; }
 
             emFila = !emFila;
             atualizarBotaoFilaUI();
 
             if (emFila) {
-                document.getElementById('status-match').innerText = "Entrando na fila... Aguardando sincronização.";
-                conexaoAtiva.send({ tipo: "entrar_fila", usuario: username });
+                document.getElementById('status-match').innerText = "Entrando na fila... Aguardando oponente.";
+                conexaoHost.send({ tipo: "entrar_fila", usuario: username });
             } else {
                 document.getElementById('status-match').innerText = "Busca cancelada.";
-                conexaoAtiva.send({ tipo: "sair_fila" });
+                conexaoHost.send({ tipo: "sair_fila" });
             }
         }
 
@@ -163,8 +159,8 @@
         }
 
         window.enviarPontuacaoExterna = function(pontosDelta) {
-            if (conexaoAtiva && conexaoAtiva.open) {
-                conexaoAtiva.send({ tipo: "atualizar_pontos", usuario: username, pontos: pontosDelta });
+            if (conexaoHost && conexaoHost.open) {
+                conexaoHost.send({ tipo: "atualizar_pontos", usuario: username, pontos: pontosDelta });
             }
         };
 
@@ -177,17 +173,18 @@
             box.innerHTML = lista.map(r => `
                 <div class="ranking-item">
                     <span><b>${r.usuario}</b></span>
-                    <span style="color:${r.pontos >= 0 ? '#00ff88' : '#ff3b30'};">${r.pontos} pts ${r.pontos < 0 ? '(Devendo)' : ''}</span>
+                    <span style="color:${r.pontos >= 0 ? '#00ff88' : '#ff3b30'};">${r.pontos} pts</span>
                 </div>
             `).join('');
         }
 
-        function BOOT_GAME(adversario) {
+        function BOOT_GAME(papel, adversario, peerIdAdv) {
             const viewport = document.getElementById('SISTEMA_VIEWPORT');
             const container = document.getElementById('SISTEMA_CONTAINER');
             viewport.style.display = 'block';
             
-            container.innerHTML = `<iframe src="jogo.html?adversario=${encodeURIComponent(adversario)}" style="width:100%; height:100%; border:none;"></iframe>`;
+            const url = `jogo.html?papel=${papel}&adversario=${encodeURIComponent(adversario)}&peerIdAdv=${peerIdAdv}&meuId=${meuPeerId}`;
+            container.innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
         }
 
         function SHUTDOWN() {
