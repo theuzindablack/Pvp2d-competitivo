@@ -1,1 +1,0 @@
-# Pvp2d-competitivo
